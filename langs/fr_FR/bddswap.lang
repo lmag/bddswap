@@ -20,3 +20,12 @@ BddSwapVersionMismatchTooltip = Attention : BDD en %s (%s) pour des scripts en %
 BddSwapVersionMismatchBadge = BDD v%s != Code v%s
 BddSwapInstallWarningTitle = Attention : vous avez une BDD en %s (%s - %s) pour des scripts en %s (%s) !
 BddSwapInstallWarningBody = Si vous faites la mise à jour, vous perdrez la BDD en %s !
+BddSwapDbName = Nom BDD
+BddSwapDbVersion = Version BDD
+BddSwapFilesVersion = Version des fichiers
+BddSwapMasterEntityName = Nom Entité Maître
+BddSwapCurrentSourceVersionAndGit = Version du code source actuel + Information sur le status git
+BddSwapGitBranch = Branche
+BddSwapGitCommit = Dernier commit
+BddSwapGitStatusClean = Répertoire de travail propre
+BddSwapGitStatusModified = Fichiers modifiés / non suivis

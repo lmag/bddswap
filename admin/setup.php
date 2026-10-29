@@ -109,6 +109,7 @@ $head = bddswapAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'database');
 
 $databases = bddswapGetDatabases($db);
+$gitInfo = bddswapGetGitStatus($db);
 
 print '<div class="opacitymedium marginbottomonly">'.dolPrintLabel($langs->trans("BddSwapSetupPage")).'</div>';
 
@@ -124,7 +125,27 @@ print '</tr>';
 
 print '<tr class="oddeven">';
 print '<td>'.dolPrintLabel($langs->trans("BddSwapCurrentDatabase")).'</td>';
-print '<td><strong>'.dolPrintLabel($conf->db->name).'</strong> <span class="opacitymedium">(DOL_VERSION = '.dolPrintLabel(DOL_VERSION).')</span></td>';
+print '<td><strong>'.dolPrintLabel($conf->db->name).'</strong></td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td>'.dolPrintLabel($langs->trans("BddSwapCurrentSourceVersionAndGit")).'</td>';
+print '<td>';
+print '<span class="badge badge-info"><strong>'.dolPrintLabel(DOL_VERSION).'</strong></span>';
+if (!empty($gitInfo['branch'])) {
+	print ' &mdash; <strong>'.dolPrintLabel($langs->trans("BddSwapGitBranch")).' :</strong> <code>'.dolPrintLabel($gitInfo['branch']).'</code>';
+}
+if (!empty($gitInfo['commit'])) {
+	print ' &mdash; <strong>'.dolPrintLabel($langs->trans("BddSwapGitCommit")).' :</strong> <span class="opacitymedium">'.dolPrintLabel($gitInfo['commit']).'</span>';
+}
+if (!empty($gitInfo['branch'])) {
+	if ($gitInfo['is_clean']) {
+		print ' <span class="badge badge-status4 badge-status">'.dolPrintLabel($langs->trans("BddSwapGitStatusClean")).'</span>';
+	} else {
+		print ' <span class="badge badge-status1 badge-status" title="'.dolPrintHTMLForAttribute($gitInfo['status']).'">'.dolPrintLabel($langs->trans("BddSwapGitStatusModified")).'</span>';
+	}
+}
+print '</td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
@@ -146,20 +167,39 @@ print '</form>';
 print '<br>';
 
 // Table of available Dolibarr databases
+$progMajor = '';
+if (preg_match('/^(\d+)/', constant('DOL_VERSION'), $mProg)) {
+	$progMajor = $mProg[1];
+}
+
 print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
-print '<td>'.dolPrintLabel($langs->trans("Database")).'</td>';
-print '<td>'.dolPrintLabel($langs->trans("BddSwapVersion")).'</td>';
-print '<td>'.dolPrintLabel($langs->trans("ThirdPartyName")).'</td>';
+print '<td>'.dolPrintLabel($langs->trans("BddSwapDbName")).'</td>';
+print '<td>'.dolPrintLabel($langs->trans("BddSwapDbVersion")).'</td>';
+print '<td>'.dolPrintLabel($langs->trans("BddSwapFilesVersion")).'</td>';
+print '<td>'.dolPrintLabel($langs->trans("BddSwapMasterEntityName")).'</td>';
 print '<td class="center">'.dolPrintLabel($langs->trans("Status")).'</td>';
 print '<td class="right">'.dolPrintLabel($langs->trans("Action")).'</td>';
 print '</tr>';
 
 foreach ($databases as $dbInfo) {
+	$dbMajor = '';
+	if (preg_match('/^(\d+)/', $dbInfo['version'], $mDb)) {
+		$dbMajor = $mDb[1];
+	}
+	$isVersionMatch = ($dbMajor !== '' && $progMajor !== '' && $dbMajor === $progMajor);
+
 	print '<tr class="oddeven">';
 	print '<td>'.img_picto('', 'database', 'class="pictofixedwidth"').'<strong>'.dolPrintLabel($dbInfo['name']).'</strong></td>';
 	print '<td>'.dolPrintLabel($dbInfo['version']).'</td>';
+	print '<td>';
+	if ($isVersionMatch) {
+		print '<span class="badge badge-status4">'.dolPrintLabel(DOL_VERSION).'</span>';
+	} else {
+		print '<span class="badge badge-warning" title="'.dolPrintHTMLForAttribute($langs->transnoentities("BddSwapVersionMismatchTooltip", $dbMajor, $dbInfo['version'], $progMajor, DOL_VERSION)).'">&#9888; '.dolPrintLabel(DOL_VERSION).'</span>';
+	}
+	print '</td>';
 	print '<td>'.dolPrintLabel($dbInfo['company']).'</td>';
 	print '<td class="center">';
 	if (!empty($dbInfo['is_current'])) {

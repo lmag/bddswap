@@ -20,3 +20,12 @@ BddSwapVersionMismatchTooltip = Warning: DB in v%s (%s) with code in v%s (%s)!
 BddSwapVersionMismatchBadge = DB v%s != Code v%s
 BddSwapInstallWarningTitle = Warning: you have a v%s database (%s - %s) with v%s scripts (%s)!
 BddSwapInstallWarningBody = If you run the upgrade, you will lose the v%s database!
+BddSwapDbName = DB Name
+BddSwapDbVersion = DB Version
+BddSwapFilesVersion = Files Version
+BddSwapMasterEntityName = Master Entity Name
+BddSwapCurrentSourceVersionAndGit = Current source code version + Git status information
+BddSwapGitBranch = Branch
+BddSwapGitCommit = Last commit
+BddSwapGitStatusClean = Clean working tree
+BddSwapGitStatusModified = Modified working tree
