@@ -278,3 +278,86 @@ function bddswapSwitchDatabase($db, $targetDbName, &$errorMsg = '')
 
 	return 1;
 }
+
+/**
+ * Retrieve git repository information (branch, commit hash) for the current Dolibarr root
+ * by reading .git/HEAD directly (and optionally git status via Utils::executeCLI when allowed).
+ *
+ * @param	DoliDB	$db	Database handler
+ * @return	array{branch:string,commit:string,status:string,is_clean:bool}
+ */
+function bddswapGetGitStatus($db): array
+{
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/utils.class.php';
+
+	$info = array(
+		'branch' => '',
+		'commit' => '',
+		'status' => '',
+		'is_clean' => true,
+	);
+
+	$repoDir = dirname(DOL_DOCUMENT_ROOT);
+	$gitDir = $repoDir.'/.git';
+	if (!dol_is_dir($gitDir)) {
+		return $info;
+	}
+
+	// Read current branch / HEAD commit directly from .git/HEAD
+	$headFile = $gitDir.'/HEAD';
+	if (dol_is_file($headFile)) {
+		$headContent = trim((string) file_get_contents($headFile));
+		if (preg_match('/^ref:\s*refs\/heads\/(.+)$/', $headContent, $m)) {
+			$info['branch'] = trim($m[1]);
+			$refFile = $gitDir.'/refs/heads/'.$info['branch'];
+			if (dol_is_file($refFile)) {
+				$fullHash = trim((string) file_get_contents($refFile));
+				$info['commit'] = dol_substr($fullHash, 0, 7);
+			} elseif (dol_is_file($gitDir.'/packed-refs')) {
+				$packedRefs = (string) file_get_contents($gitDir.'/packed-refs');
+				if (preg_match('/^([0-9a-f]{40})\s+refs\/heads\/'.preg_quote($info['branch'], '/').'\s*$/m', $packedRefs, $mp)) {
+					$info['commit'] = dol_substr($mp[1], 0, 7);
+				}
+			}
+		} else {
+			$info['branch'] = 'HEAD';
+			$info['commit'] = dol_substr($headContent, 0, 7);
+		}
+	}
+
+	// Read last commit message from .git/logs/HEAD if available
+	$headLogFile = $gitDir.'/logs/HEAD';
+	if (dol_is_file($headLogFile)) {
+		$lines = file($headLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		if (!empty($lines)) {
+			$lastLine = (string) end($lines);
+			if (preg_match('/^([0-9a-f]{40})\s+([0-9a-f]{40})\s+.*?\t(.*)$/', $lastLine, $ml)) {
+				if (empty($info['commit'])) {
+					$info['commit'] = dol_substr($ml[2], 0, 7);
+				}
+				$info['commit'] .= ' ('.$ml[3].')';
+			}
+		}
+	}
+
+	// If git is allowed in $dolibarr_main_restrict_os_commands, enrich with commit details and working tree status
+	global $dolibarr_main_restrict_os_commands;
+	$allowedCmds = !empty($dolibarr_main_restrict_os_commands) ? array_map('trim', explode(',', (string) $dolibarr_main_restrict_os_commands)) : array();
+	if (empty($allowedCmds) || in_array('git', $allowedCmds, true) || in_array('git.exe', $allowedCmds, true)) {
+		$utils = new Utils($db);
+		$escapedRepoDir = escapeshellarg($repoDir);
+		$resCommit = $utils->executeCLI('git -C '.$escapedRepoDir.' log -1 --format="%h - %s (%ci)"', '', 0, null, 1);
+		if ($resCommit['result'] === 0 && !empty($resCommit['output'])) {
+			$info['commit'] = trim((string) $resCommit['output']);
+		}
+		$resStatus = $utils->executeCLI('git -C '.$escapedRepoDir.' status --short', '', 0, null, 1);
+		if ($resStatus['result'] === 0) {
+			$statusOut = trim((string) $resStatus['output']);
+			$info['status'] = $statusOut;
+			$info['is_clean'] = ($statusOut === '');
+		}
+	}
+
+	return $info;
+}
