@@ -1,0 +1,22 @@
+# Dolibarr language file - Source file is en_US - bddswap
+ModuleBddSwapName = Sélecteur de base de données (BddSwap)
+ModuleBddSwapDesc = Basculez rapidement entre plusieurs bases de données Dolibarr depuis la barre supérieure ou la configuration du module
+ModuleBddSwapDescLong = BddSwap ajoute un sélecteur de base de données dans la barre supérieure de Dolibarr, dans la page de configuration du module et sur la page /install/check.php (avec une alerte en cas d'écart de version) afin de permettre aux administrateurs de changer la base de données active dans conf.php en un clic.
+BddSwapSetup = Configuration du module BddSwap
+BddSwapSetupPage = Sélectionnez la base de données Dolibarr active dans conf.php
+BddSwapCurrentDatabase = Base de données actuelle
+BddSwapTargetDatabase = Base de données cible
+BddSwapAvailableDatabases = Bases de données Dolibarr disponibles
+BddSwapSwitch = Changer de base de données
+BddSwapSwitchedSuccess = Base de données active basculée vers %s
+BddSwapErrorNotAdmin = Seul un administrateur peut changer de base de données
+BddSwapErrorInvalidDatabase = Base de données Dolibarr invalide ou inconnue : %s
+BddSwapErrorConfNotWritable = Le fichier de configuration conf.php n'est pas accessible en écriture
+BddSwapErrorConfWriteFailed = Échec de la mise à jour du fichier de configuration conf.php
+BddSwapVersion = Version Dolibarr
+BddSwapActive = Active
+BddSwapAutoEnableOnTarget = Conserver automatiquement BddSwap actif dans la base de données cible lors du changement
+BddSwapVersionMismatchTooltip = Attention : BDD en %s (%s) pour des scripts en %s (%s) !
+BddSwapVersionMismatchBadge = BDD v%s != Code v%s
+BddSwapInstallWarningTitle = Attention : vous avez une BDD en %s (%s - %s) pour des scripts en %s (%s) !
+BddSwapInstallWarningBody = Si vous faites la mise à jour, vous perdrez la BDD en %s !
