@@ -90,6 +90,7 @@ class ActionsBddSwap extends CommonHookActions
 		}
 
 		$swapUrl = dol_buildpath('/bddswap/swap.php', 1);
+		$setupUrl = dol_buildpath('/bddswap/admin/setup.php', 1);
 		$currentUrl = $_SERVER["REQUEST_URI"] ?? '';
 
 		$out = '<div class="login_block_elem bddswap-top-container">';
@@ -97,7 +98,9 @@ class ActionsBddSwap extends CommonHookActions
 		$out .= '<input type="hidden" name="token" value="'.dolPrintHTMLForAttribute(newToken()).'">';
 		$out .= '<input type="hidden" name="action" value="swapdb">';
 		$out .= '<input type="hidden" name="backtopage" value="'.dolPrintHTMLForAttribute($currentUrl).'">';
-		$out .= img_picto($langs->trans("BddSwapCurrentDatabase"), 'database', 'class="atoplogin valignmiddle"');
+		$out .= '<a href="'.dolPrintHTMLForAttributeUrl($setupUrl).'" class="bddswap-setup-link" title="'.dolPrintHTMLForAttribute($langs->trans("BddSwapSetup")).'">';
+		$out .= img_picto($langs->trans("BddSwapSetup"), 'database', 'class="atoplogin valignmiddle"');
+		$out .= '</a>';
 		$out .= '<select name="target_db" class="flat bddswap-select" title="'.dolPrintHTMLForAttribute($langs->trans("BddSwapSwitch")).'">';
 		$currentDbVersion = '';
 		foreach ($databases as $dbInfo) {

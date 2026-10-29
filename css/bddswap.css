@@ -27,6 +27,18 @@ div.login_block_other {
 	line-height: 1;
 }
 
+.bddswap-setup-link {
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+	cursor: pointer;
+	opacity: 0.9;
+}
+
+.bddswap-setup-link:hover {
+	opacity: 1;
+}
+
 .bddswap-select {
 	background-color: rgba(255, 255, 255, 0.15) !important;
 	color: var(--colortextbackhmenu, #ffffff) !important;
