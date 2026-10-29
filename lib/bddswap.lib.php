@@ -1,0 +1,280 @@
+<?php
+/* Copyright (C) 2026 Laurent Magnin
+ * Copyright (C) 2026 Eoxia <dev@eoxia.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+declare(strict_types=1);
+
+/**
+ * \file    htdocs/custom/bddswap/lib/bddswap.lib.php
+ * \ingroup bddswap
+ * \brief   Library files with common functions for BddSwap
+ */
+
+/**
+ * Prepare admin pages header
+ *
+ * @return array<int,array{0:string,1:string,2:string}> Array of tabs
+ */
+function bddswapAdminPrepareHead(): array
+{
+	global $langs, $conf;
+
+	$langs->load("bddswap@bddswap");
+
+	$h = 0;
+	$head = array();
+
+	$head[$h][0] = dol_buildpath("/bddswap/admin/setup.php", 1);
+	$head[$h][1] = $langs->trans("Settings");
+	$head[$h][2] = 'settings';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/bddswap/admin/about.php", 1);
+	$head[$h][1] = $langs->trans("About");
+	$head[$h][2] = 'about';
+	$h++;
+
+	complete_head_from_modules($conf, $langs, null, $head, $h, 'bddswap@bddswap');
+	complete_head_from_modules($conf, $langs, null, $head, $h, 'bddswap@bddswap', 'remove');
+
+	return $head;
+}
+
+/**
+ * Return the list of available Dolibarr databases on the current MySQL server
+ * that contain a table matching the current table prefix + 'const'.
+ *
+ * @param	DoliDB	$db		Database handler
+ * @return	array<string,array{name:string,version:string,company:string,is_current:bool}>	Map of databases indexed by db name
+ */
+function bddswapGetDatabases($db)
+{
+	global $conf;
+
+	$databases = array();
+	$systemSchemas = array('information_schema', 'mysql', 'performance_schema', 'sys');
+	$prefix = $db->prefix();
+	$constTable = $prefix.'const';
+
+	$sqlShowDatabases = "SHOW DATABASES";
+	$resql = $db->query($sqlShowDatabases);
+	if (!$resql) {
+		return $databases;
+	}
+
+	$dbNames = array();
+	while ($row = $db->fetch_array($resql)) {
+		$candidateName = (string) $row[0];
+		if (in_array(dol_strtolower($candidateName), $systemSchemas, true)) {
+			continue;
+		}
+		if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $candidateName)) {
+			continue;
+		}
+		$dbNames[] = $candidateName;
+	}
+
+	foreach ($dbNames as $candidateName) {
+		$sqlCheckConst = "SHOW TABLES FROM `".$db->escape($candidateName)."` LIKE '".$db->escape($constTable)."'";
+		$resCheck = $db->query($sqlCheckConst);
+		if (!$resCheck || $db->num_rows($resCheck) === 0) {
+			continue;
+		}
+
+		$version = '';
+		$company = '';
+		$sqlConst = "SELECT name, value FROM `".$db->escape($candidateName)."`.`".$db->escape($constTable)."`";
+		$sqlConst .= " WHERE name IN ('MAIN_VERSION_LAST_UPGRADE', 'MAIN_VERSION_LAST_INSTALL', 'MAIN_INFO_SOCIETE_NOM')";
+		$resConst = $db->query($sqlConst);
+		if ($resConst) {
+			$lastInstall = '';
+			$lastUpgrade = '';
+			while ($obj = $db->fetch_object($resConst)) {
+				if ($obj->name === 'MAIN_VERSION_LAST_UPGRADE' && !empty($obj->value)) {
+					$lastUpgrade = (string) $obj->value;
+				} elseif ($obj->name === 'MAIN_VERSION_LAST_INSTALL' && !empty($obj->value)) {
+					$lastInstall = (string) $obj->value;
+				} elseif ($obj->name === 'MAIN_INFO_SOCIETE_NOM' && empty($company) && !empty($obj->value)) {
+					$company = (string) $obj->value;
+				}
+			}
+			$version = !empty($lastUpgrade) ? $lastUpgrade : $lastInstall;
+		}
+
+		$databases[$candidateName] = array(
+			'name' => $candidateName,
+			'version' => $version,
+			'company' => $company,
+			'is_current' => ($candidateName === $conf->db->name),
+		);
+	}
+
+	return $databases;
+}
+
+/**
+ * Copy BddSwap activation constants from the current database to the target database
+ * so the top-bar selector remains active after switching.
+ *
+ * @param	DoliDB	$db				Database handler
+ * @param	string	$targetDbName	Target database name
+ * @return	int						1 if OK, <0 if KO
+ */
+function bddswapEnsureModuleEnabledOnTarget($db, $targetDbName)
+{
+	if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $targetDbName)) {
+		return -1;
+	}
+
+	$constTable = $db->prefix().'const';
+	$sqlSelect = "SELECT name, entity, value, type, visible, note FROM ".$constTable;
+	$sqlSelect .= " WHERE name LIKE 'MAIN_MODULE_BDDSWAP%'";
+	$resql = $db->query($sqlSelect);
+	if (!$resql) {
+		return -1;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$sqlCheck = "SELECT rowid FROM `".$db->escape($targetDbName)."`.`".$db->escape($constTable)."`";
+		$sqlCheck .= " WHERE name = '".$db->escape($obj->name)."' AND entity = ".((int) $obj->entity);
+		$resCheck = $db->query($sqlCheck);
+		if ($resCheck && $db->num_rows($resCheck) === 0) {
+			$sqlInsert = "INSERT INTO `".$db->escape($targetDbName)."`.`".$db->escape($constTable)."`";
+			$sqlInsert .= " (name, entity, value, type, visible, note) VALUES (";
+			$sqlInsert .= "'".$db->escape($obj->name)."', ";
+			$sqlInsert .= ((int) $obj->entity).", ";
+			$sqlInsert .= "'".$db->escape((string) $obj->value)."', ";
+			$sqlInsert .= "'".$db->escape((string) $obj->type)."', ";
+			$sqlInsert .= ((int) $obj->visible).", ";
+			$sqlInsert .= "'".$db->escape((string) $obj->note)."')";
+			$db->query($sqlInsert);
+		} elseif ($resCheck && $db->num_rows($resCheck) > 0) {
+			$sqlUpdate = "UPDATE `".$db->escape($targetDbName)."`.`".$db->escape($constTable)."`";
+			$sqlUpdate .= " SET value = '".$db->escape((string) $obj->value)."'";
+			$sqlUpdate .= " WHERE name = '".$db->escape($obj->name)."' AND entity = ".((int) $obj->entity);
+			$db->query($sqlUpdate);
+		}
+	}
+
+	return 1;
+}
+
+/**
+ * Update conf.php to switch $dolibarr_main_db_name to the selected database.
+ *
+ * @param	DoliDB	$db				Database handler
+ * @param	string	$targetDbName	Target database name
+ * @param	string	$errorMsg		Output error message key if failed
+ * @return	int						1 if OK, <0 if KO
+ */
+function bddswapSwitchDatabase($db, $targetDbName, &$errorMsg = '')
+{
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	$availableDbs = bddswapGetDatabases($db);
+	if (empty($targetDbName) || !isset($availableDbs[$targetDbName])) {
+		$errorMsg = 'BddSwapErrorInvalidDatabase';
+		return -1;
+	}
+
+	$confFile = DOL_DOCUMENT_ROOT.'/conf/conf.php';
+	if (!dol_is_file($confFile)) {
+		$errorMsg = 'BddSwapErrorConfNotWritable';
+		return -2;
+	}
+
+	if (!is_writable($confFile)) {
+		@chmod($confFile, 0664);
+		if (!is_writable($confFile)) {
+			$errorMsg = 'BddSwapErrorConfNotWritable';
+			return -2;
+		}
+	}
+
+	$content = file_get_contents($confFile);
+	if ($content === false) {
+		$errorMsg = 'BddSwapErrorConfNotWritable';
+		return -2;
+	}
+
+	$lines = preg_split("/(\r\n|\n|\r)/", $content, -1, PREG_SPLIT_DELIM_CAPTURE);
+	if (!is_array($lines)) {
+		$errorMsg = 'BddSwapErrorConfWriteFailed';
+		return -3;
+	}
+
+	// Check if target database already has a commented or active line in conf.php
+	$hasTargetLine = false;
+	foreach ($lines as $line) {
+		if (preg_match('/^\s*(?:\/\/\s*)?\$dolibarr_main_db_name\s*=\s*[\'"]'.preg_quote($targetDbName, '/').'[\'"]\s*;/', $line)) {
+			$hasTargetLine = true;
+			break;
+		}
+	}
+
+	$updated = false;
+	$lastDbLineIndex = -1;
+	$lastIndent = '';
+	$countLines = count($lines);
+	for ($i = 0; $i < $countLines; $i += 2) {
+		$line = $lines[$i];
+		if (preg_match('/^(\s*)(?:\/\/\s*)?(\$dolibarr_main_db_name\s*=\s*[\'"]([^\'"]+)[\'"]\s*;.*)$/', $line, $m)) {
+			$indent = $m[1];
+			$rest = $m[2];
+			$dbInLine = $m[3];
+			$lastDbLineIndex = $i;
+			$lastIndent = $indent;
+			if ($hasTargetLine && $dbInLine === $targetDbName) {
+				$lines[$i] = $indent.$rest;
+				$updated = true;
+			} else {
+				$lines[$i] = $indent.'//'.$rest;
+			}
+		}
+	}
+
+	if (!$hasTargetLine && $lastDbLineIndex >= 0) {
+		$lineEnding = isset($lines[$lastDbLineIndex + 1]) ? $lines[$lastDbLineIndex + 1] : "\n";
+		$lines[$lastDbLineIndex] .= $lineEnding.$lastIndent."\$dolibarr_main_db_name='".$targetDbName."';";
+		$updated = true;
+	}
+
+	if (!$updated) {
+		$errorMsg = 'BddSwapErrorConfWriteFailed';
+		return -3;
+	}
+
+	$newContent = implode('', $lines);
+	if (strpos($newContent, 'bddswap_install.inc.php') === false) {
+		$newContent = rtrim($newContent)."\nif (defined('DOL_INC_FOR_VERSION_ERROR') && file_exists(__DIR__.'/../custom/bddswap/lib/bddswap_install.inc.php')) {\n\tinclude_once __DIR__.'/../custom/bddswap/lib/bddswap_install.inc.php';\n}\n";
+	}
+	if (file_put_contents($confFile, $newContent) === false) {
+		$errorMsg = 'BddSwapErrorConfWriteFailed';
+		return -3;
+	}
+
+	if (function_exists('opcache_invalidate')) {
+		@opcache_invalidate($confFile, true);
+	}
+
+	if (getDolGlobalInt('BDDSWAP_AUTO_ENABLE_ON_TARGET', 1)) {
+		bddswapEnsureModuleEnabledOnTarget($db, $targetDbName);
+	}
+
+	dol_syslog("BddSwap: switched database in conf.php to ".$targetDbName, LOG_INFO);
+
+	return 1;
+}

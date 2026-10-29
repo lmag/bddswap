@@ -1,0 +1,64 @@
+/* BddSwap top bar selector styles */
+div.login_block_other {
+	max-width: none !important;
+}
+
+.login_block_other .bddswap-top-container {
+	float: left !important;
+	display: inline-flex !important;
+	align-items: center;
+	height: 50px !important;
+	line-height: 50px !important;
+	padding: 0 10px 0 4px !important;
+	white-space: nowrap;
+}
+
+.bddswap-top-form {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	white-space: nowrap;
+}
+
+.bddswap-top-form .atoplogin {
+	float: none !important;
+	display: inline-block;
+	line-height: 1;
+}
+
+.bddswap-select {
+	background-color: rgba(255, 255, 255, 0.15) !important;
+	color: var(--colortextbackhmenu, #ffffff) !important;
+	border: 1px solid rgba(255, 255, 255, 0.35) !important;
+	border-radius: 4px !important;
+	padding: 2px 8px !important;
+	height: 26px !important;
+	line-height: 20px !important;
+	font-size: 12px !important;
+	max-width: 210px;
+	cursor: pointer;
+	vertical-align: middle;
+	outline: none;
+}
+
+.bddswap-select:hover,
+.bddswap-select:focus {
+	background-color: rgba(255, 255, 255, 0.25) !important;
+	border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.bddswap-select option {
+	background-color: #ffffff;
+	color: #222222;
+}
+
+@media only screen and (max-width: 767px) {
+	.login_block_other .bddswap-top-container {
+		height: 38px !important;
+		line-height: 38px !important;
+	}
+	.bddswap-select {
+		max-width: 140px;
+	}
+}

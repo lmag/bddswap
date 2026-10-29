@@ -1,0 +1,22 @@
+# Dolibarr language file - Source file is en_US - bddswap
+ModuleBddSwapName = Database Switcher (BddSwap)
+ModuleBddSwapDesc = Quickly switch between Dolibarr databases from the top bar or module setup page
+ModuleBddSwapDescLong = BddSwap adds a database selector in the Dolibarr top bar, on the module setup page, and on the /install/check.php page (with a version mismatch warning) so administrators can switch between multiple Dolibarr databases in conf.php with a single click.
+BddSwapSetup = BddSwap Setup
+BddSwapSetupPage = Select the active Dolibarr database in conf.php
+BddSwapCurrentDatabase = Current database
+BddSwapTargetDatabase = Target database
+BddSwapAvailableDatabases = Available Dolibarr databases
+BddSwapSwitch = Switch database
+BddSwapSwitchedSuccess = Active database switched to %s
+BddSwapErrorNotAdmin = Only an administrator can switch databases
+BddSwapErrorInvalidDatabase = Invalid or unknown Dolibarr database: %s
+BddSwapErrorConfNotWritable = Configuration file conf.php is not writable
+BddSwapErrorConfWriteFailed = Failed to update configuration file conf.php
+BddSwapVersion = Dolibarr version
+BddSwapActive = Active
+BddSwapAutoEnableOnTarget = Automatically keep BddSwap active in the target database when switching
+BddSwapVersionMismatchTooltip = Warning: DB in v%s (%s) with code in v%s (%s)!
+BddSwapVersionMismatchBadge = DB v%s != Code v%s
+BddSwapInstallWarningTitle = Warning: you have a v%s database (%s - %s) with v%s scripts (%s)!
+BddSwapInstallWarningBody = If you run the upgrade, you will lose the v%s database!
