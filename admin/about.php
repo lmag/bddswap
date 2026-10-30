@@ -97,7 +97,7 @@ $linkback = '<a href="'.dolPrintHTMLForAttributeUrl($backtopage ? $backtopage : 
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 $head = bddswapAdminPrepareHead();
-print dol_get_fiche_head($head, 'about', $langs->trans($title), -1, 'database');
+print dol_get_fiche_head($head, 'about', $langs->trans($title), -1, 'fa-database');
 
 dol_include_once('/bddswap/core/modules/modBddSwap.class.php');
 $tmpmodule = new modBddSwap($db);
