@@ -92,6 +92,16 @@ if ($action === 'swapdb' && !empty($targetDb)) {
 	} else {
 		setEventMessages($langs->trans($errorMsgKey, $targetDb), null, 'errors');
 	}
+} elseif ($action === 'createdb' && !empty($targetDb)) {
+	$errorMsgKey = '';
+	$result = bddswapCreateDatabase($db, $targetDb, $errorMsgKey);
+	if ($result > 0) {
+		setEventMessages($langs->trans("BddSwapCreatedSuccess", $targetDb), null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"]);
+		exit;
+	} else {
+		setEventMessages($langs->trans($errorMsgKey, $targetDb), null, 'errors');
+	}
 }
 
 
@@ -108,7 +118,7 @@ print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 $head = bddswapAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'database');
 
-$databases = bddswapGetDatabases($db);
+$databases = bddswapGetDatabases($db, true);
 $gitInfo = bddswapGetGitStatus($db);
 
 print '<div class="opacitymedium marginbottomonly">'.dolPrintLabel($langs->trans("BddSwapSetupPage")).'</div>';
@@ -153,6 +163,9 @@ print '<td>'.dolPrintLabel($langs->trans("BddSwapTargetDatabase")).'</td>';
 print '<td>';
 print '<select name="target_db" class="flat minwidth200">';
 foreach ($databases as $dbInfo) {
+	if (empty($dbInfo['exists'])) {
+		continue;
+	}
 	$label = $dbInfo['name'].(!empty($dbInfo['version']) ? ' ('.$dbInfo['version'].')' : '');
 	$selected = !empty($dbInfo['is_current']) ? ' selected="selected"' : '';
 	print '<option value="'.dolPrintHTMLForAttribute($dbInfo['name']).'"'.$selected.'>'.dolPrintLabel($label).'</option>';
@@ -184,6 +197,8 @@ print '<td class="right">'.dolPrintLabel($langs->trans("Action")).'</td>';
 print '</tr>';
 
 foreach ($databases as $dbInfo) {
+	$dbExists = !empty($dbInfo['exists']);
+	$hasTables = !empty($dbInfo['has_tables']);
 	$dbMajor = '';
 	if (preg_match('/^(\d+)/', $dbInfo['version'], $mDb)) {
 		$dbMajor = $mDb[1];
@@ -192,24 +207,43 @@ foreach ($databases as $dbInfo) {
 
 	print '<tr class="oddeven">';
 	print '<td>'.img_picto('', 'database', 'class="pictofixedwidth"').'<strong>'.dolPrintLabel($dbInfo['name']).'</strong></td>';
-	print '<td>'.dolPrintLabel($dbInfo['version']).'</td>';
 	print '<td>';
-	if ($isVersionMatch) {
-		print '<span class="badge badge-status4">'.dolPrintLabel(DOL_VERSION).'</span>';
+	if (!$dbExists) {
+		print '<span class="opacitymedium">-</span>';
+	} elseif (!$hasTables) {
+		print '<span class="opacitymedium">'.dolPrintLabel($langs->trans("BddSwapEmptyDatabase")).'</span>';
 	} else {
-		print '<span class="badge badge-warning" title="'.dolPrintHTMLForAttribute($langs->transnoentities("BddSwapVersionMismatchTooltip", $dbMajor, $dbInfo['version'], $progMajor, DOL_VERSION)).'">&#9888; '.dolPrintLabel(DOL_VERSION).'</span>';
+		print dolPrintLabel($dbInfo['version']);
 	}
 	print '</td>';
-	print '<td>'.dolPrintLabel($dbInfo['company']).'</td>';
+	print '<td>';
+	if (!$dbExists) {
+		print '<span class="opacitymedium">-</span>';
+	} elseif ($isVersionMatch) {
+		print '<span class="badge badge-status4">'.dolPrintLabel(DOL_VERSION).'</span>';
+	} else {
+		print '<span class="badge badge-warning" title="'.dolPrintHTMLForAttribute($langs->transnoentities("BddSwapVersionMismatchTooltip", $dbMajor ?: '?', $dbInfo['version'] ?: '-', $progMajor, DOL_VERSION)).'">&#9888; '.dolPrintLabel(DOL_VERSION).'</span>';
+	}
+	print '</td>';
+	print '<td>'.($dbInfo['company'] !== '' ? dolPrintLabel($dbInfo['company']) : '<span class="opacitymedium">-</span>').'</td>';
 	print '<td class="center">';
 	if (!empty($dbInfo['is_current'])) {
 		print '<span class="badge badge-status4 badge-status">'.dolPrintLabel($langs->trans("BddSwapActive")).'</span>';
+	} elseif (!$dbExists) {
+		print '<span class="badge badge-status0 badge-status">'.dolPrintLabel($langs->trans("BddSwapNotCreated")).'</span>';
 	} else {
 		print '-';
 	}
 	print '</td>';
 	print '<td class="right">';
-	if (empty($dbInfo['is_current'])) {
+	if (!$dbExists) {
+		print '<form method="POST" action="'.dolPrintHTMLForAttributeUrl($_SERVER["PHP_SELF"]).'" class="inline-block">';
+		print '<input type="hidden" name="token" value="'.dolPrintHTMLForAttribute(newToken()).'">';
+		print '<input type="hidden" name="action" value="createdb">';
+		print '<input type="hidden" name="target_db" value="'.dolPrintHTMLForAttribute($dbInfo['name']).'">';
+		print '<input type="submit" class="button smallpaddingimp" value="'.dolPrintHTMLForAttribute($langs->trans("BddSwapCreateDatabase")).'">';
+		print '</form>';
+	} elseif (empty($dbInfo['is_current'])) {
 		print '<form method="POST" action="'.dolPrintHTMLForAttributeUrl($_SERVER["PHP_SELF"]).'" class="inline-block">';
 		print '<input type="hidden" name="token" value="'.dolPrintHTMLForAttribute(newToken()).'">';
 		print '<input type="hidden" name="action" value="swapdb">';

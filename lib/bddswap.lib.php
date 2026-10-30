@@ -54,13 +54,57 @@ function bddswapAdminPrepareHead(): array
 }
 
 /**
- * Return the list of available Dolibarr databases on the current MySQL server
- * that contain a table matching the current table prefix + 'const'.
+ * Return the list of preset Dolibarr database names that should always be proposed
+ * in the setup page (with a button to create them when they do not exist yet).
  *
- * @param	DoliDB	$db		Database handler
- * @return	array<string,array{name:string,version:string,company:string,is_current:bool}>	Map of databases indexed by db name
+ * @return string[] List of preset database names
  */
-function bddswapGetDatabases($db)
+function bddswapGetPresetDatabaseNames(): array
+{
+	return array(
+		'dolibarr-21',
+		'dolibarr-20',
+		'dolibarr-19',
+		'dolibarr-18',
+	);
+}
+
+/**
+ * Create an empty MySQL/MariaDB database with UTF-8 collation.
+ *
+ * @param	DoliDB	$db				Database handler
+ * @param	string	$targetDbName	Database name to create
+ * @param	string	$errorMsg		Output error message key if failed
+ * @return	int						1 if OK, <0 if KO
+ */
+function bddswapCreateDatabase($db, string $targetDbName, string &$errorMsg = ''): int
+{
+	if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $targetDbName)) {
+		$errorMsg = 'BddSwapErrorInvalidDatabase';
+		return -1;
+	}
+
+	$sqlCreate = "CREATE DATABASE IF NOT EXISTS `".$db->escape($targetDbName)."` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+	$resql = $db->query($sqlCreate);
+	if (!$resql) {
+		$errorMsg = 'BddSwapErrorCreateDatabaseFailed';
+		return -2;
+	}
+
+	dol_syslog("BddSwap: created database ".$targetDbName, LOG_INFO);
+
+	return 1;
+}
+
+/**
+ * Return the list of available Dolibarr databases on the current MySQL server
+ * that contain a table matching the current table prefix + 'const' (or exist in the preset list).
+ *
+ * @param	DoliDB	$db				Database handler
+ * @param	bool	$includePresets	Include preset databases even if not created/initialized yet
+ * @return	array<string,array{name:string,version:string,company:string,is_current:bool,exists:bool,has_tables:bool}>	Map of databases indexed by db name
+ */
+function bddswapGetDatabases($db, bool $includePresets = false)
 {
 	global $conf;
 
@@ -68,6 +112,7 @@ function bddswapGetDatabases($db)
 	$systemSchemas = array('information_schema', 'mysql', 'performance_schema', 'sys');
 	$prefix = $db->prefix();
 	$constTable = $prefix.'const';
+	$presetNames = bddswapGetPresetDatabaseNames();
 
 	$sqlShowDatabases = "SHOW DATABASES";
 	$resql = $db->query($sqlShowDatabases);
@@ -90,28 +135,32 @@ function bddswapGetDatabases($db)
 	foreach ($dbNames as $candidateName) {
 		$sqlCheckConst = "SHOW TABLES FROM `".$db->escape($candidateName)."` LIKE '".$db->escape($constTable)."'";
 		$resCheck = $db->query($sqlCheckConst);
-		if (!$resCheck || $db->num_rows($resCheck) === 0) {
+		$hasConstTable = ($resCheck && $db->num_rows($resCheck) > 0);
+
+		if (!$hasConstTable && !in_array($candidateName, $presetNames, true) && $candidateName !== $conf->db->name) {
 			continue;
 		}
 
 		$version = '';
 		$company = '';
-		$sqlConst = "SELECT name, value FROM `".$db->escape($candidateName)."`.`".$db->escape($constTable)."`";
-		$sqlConst .= " WHERE name IN ('MAIN_VERSION_LAST_UPGRADE', 'MAIN_VERSION_LAST_INSTALL', 'MAIN_INFO_SOCIETE_NOM')";
-		$resConst = $db->query($sqlConst);
-		if ($resConst) {
-			$lastInstall = '';
-			$lastUpgrade = '';
-			while ($obj = $db->fetch_object($resConst)) {
-				if ($obj->name === 'MAIN_VERSION_LAST_UPGRADE' && !empty($obj->value)) {
-					$lastUpgrade = (string) $obj->value;
-				} elseif ($obj->name === 'MAIN_VERSION_LAST_INSTALL' && !empty($obj->value)) {
-					$lastInstall = (string) $obj->value;
-				} elseif ($obj->name === 'MAIN_INFO_SOCIETE_NOM' && empty($company) && !empty($obj->value)) {
-					$company = (string) $obj->value;
+		if ($hasConstTable) {
+			$sqlConst = "SELECT name, value FROM `".$db->escape($candidateName)."`.`".$db->escape($constTable)."`";
+			$sqlConst .= " WHERE name IN ('MAIN_VERSION_LAST_UPGRADE', 'MAIN_VERSION_LAST_INSTALL', 'MAIN_INFO_SOCIETE_NOM')";
+			$resConst = $db->query($sqlConst);
+			if ($resConst) {
+				$lastInstall = '';
+				$lastUpgrade = '';
+				while ($obj = $db->fetch_object($resConst)) {
+					if ($obj->name === 'MAIN_VERSION_LAST_UPGRADE' && !empty($obj->value)) {
+						$lastUpgrade = (string) $obj->value;
+					} elseif ($obj->name === 'MAIN_VERSION_LAST_INSTALL' && !empty($obj->value)) {
+						$lastInstall = (string) $obj->value;
+					} elseif ($obj->name === 'MAIN_INFO_SOCIETE_NOM' && empty($company) && !empty($obj->value)) {
+						$company = (string) $obj->value;
+					}
 				}
+				$version = !empty($lastUpgrade) ? $lastUpgrade : $lastInstall;
 			}
-			$version = !empty($lastUpgrade) ? $lastUpgrade : $lastInstall;
 		}
 
 		$databases[$candidateName] = array(
@@ -119,7 +168,24 @@ function bddswapGetDatabases($db)
 			'version' => $version,
 			'company' => $company,
 			'is_current' => ($candidateName === $conf->db->name),
+			'exists' => true,
+			'has_tables' => $hasConstTable,
 		);
+	}
+
+	if ($includePresets) {
+		foreach ($presetNames as $presetName) {
+			if (!isset($databases[$presetName])) {
+				$databases[$presetName] = array(
+					'name' => $presetName,
+					'version' => '',
+					'company' => '',
+					'is_current' => ($presetName === $conf->db->name),
+					'exists' => false,
+					'has_tables' => false,
+				);
+			}
+		}
 	}
 
 	return $databases;
@@ -140,6 +206,12 @@ function bddswapEnsureModuleEnabledOnTarget($db, $targetDbName)
 	}
 
 	$constTable = $db->prefix().'const';
+	$sqlCheckTable = "SHOW TABLES FROM `".$db->escape($targetDbName)."` LIKE '".$db->escape($constTable)."'";
+	$resTable = $db->query($sqlCheckTable);
+	if (!$resTable || $db->num_rows($resTable) === 0) {
+		return 0;
+	}
+
 	$sqlSelect = "SELECT name, entity, value, type, visible, note FROM ".$constTable;
 	$sqlSelect .= " WHERE name LIKE 'MAIN_MODULE_BDDSWAP%'";
 	$resql = $db->query($sqlSelect);
@@ -184,8 +256,8 @@ function bddswapSwitchDatabase($db, $targetDbName, &$errorMsg = '')
 {
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
-	$availableDbs = bddswapGetDatabases($db);
-	if (empty($targetDbName) || !isset($availableDbs[$targetDbName])) {
+	$availableDbs = bddswapGetDatabases($db, true);
+	if (empty($targetDbName) || !isset($availableDbs[$targetDbName]) || empty($availableDbs[$targetDbName]['exists'])) {
 		$errorMsg = 'BddSwapErrorInvalidDatabase';
 		return -1;
 	}
