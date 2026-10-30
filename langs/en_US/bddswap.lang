@@ -34,3 +34,6 @@ BddSwapCreatedSuccess = Database %s created successfully
 BddSwapErrorCreateDatabaseFailed = Failed to create database %s
 BddSwapNotCreated = Not created
 BddSwapEmptyDatabase = Empty (not initialized)
+BddSwapGitCheckoutBranch = Git checkout %s
+BddSwapGitCheckoutSuccess = Git branch switched to %s
+BddSwapErrorGitCheckoutFailed = Failed to checkout Git branch %s: %s
