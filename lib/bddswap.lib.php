@@ -433,3 +433,135 @@ function bddswapGetGitStatus($db): array
 
 	return $info;
 }
+
+/**
+ * Determine the target Dolibarr git branch corresponding to a database entry
+ * (based on its Dolibarr version or database name).
+ *
+ * @param	string	$dbName		Database name (e.g. 'dolibarr22', 'dolibarr-19', 'fork-dolibarr-develop')
+ * @param	string	$dbVersion	Dolibarr version recorded in DB (e.g. '22.0.4', '25.0.0-alpha')
+ * @return	string				Target git branch name (e.g. '22.0', '19.0', 'develop') or '' if unknown
+ */
+function bddswapGetTargetGitBranch(string $dbName, string $dbVersion = ''): string
+{
+	if (stripos($dbName, 'develop') !== false || stripos($dbVersion, 'alpha') !== false) {
+		return 'develop';
+	}
+
+	if (preg_match('/^(\d+)\./', $dbVersion, $mVer)) {
+		$major = (int) $mVer[1];
+		if ($major >= 25) {
+			return 'develop';
+		}
+		return $major.'.0';
+	}
+
+	if (preg_match('/(\d{2})$/', $dbName, $mName)) {
+		$major = (int) $mName[1];
+		if ($major >= 25) {
+			return 'develop';
+		}
+		return $major.'.0';
+	}
+
+	return '';
+}
+
+/**
+ * Ensure `git` and `git.exe` are present in $dolibarr_main_restrict_os_commands in conf.php
+ * so Utils::executeCLI() is allowed to run git commands.
+ *
+ * @return void
+ */
+function bddswapAllowGitInConf(): void
+{
+	global $dolibarr_main_restrict_os_commands;
+
+	if (empty($dolibarr_main_restrict_os_commands)) {
+		return;
+	}
+
+	$allowedCmds = array_map('trim', explode(',', (string) $dolibarr_main_restrict_os_commands));
+	if (in_array('git', $allowedCmds, true) && in_array('git.exe', $allowedCmds, true)) {
+		return;
+	}
+
+	$dolibarr_main_restrict_os_commands .= ', git, git.exe';
+
+	$confFile = DOL_DOCUMENT_ROOT.'/conf/conf.php';
+	if (dol_is_file($confFile) && is_writable($confFile)) {
+		$content = file_get_contents($confFile);
+		if ($content !== false) {
+			$newContent = preg_replace(
+				'/(\$dolibarr_main_restrict_os_commands\s*=\s*[\'"])([^\'"]*?)([\'"]\s*;)/',
+				'$1$2, git, git.exe$3',
+				$content,
+				1
+			);
+			if ($newContent !== null && $newContent !== $content) {
+				file_put_contents($confFile, $newContent);
+			}
+		}
+	}
+}
+
+/**
+ * Checkout the specified Dolibarr git branch on the root Dolibarr repository
+ * using Dolibarr's Utils::executeCLI().
+ *
+ * @param	DoliDB	$db				Database handler
+ * @param	string	$targetBranch	Git branch name (e.g. '22.0', '23.0', '24.0', 'develop')
+ * @param	string	$errorDetail	Output error detail if checkout fails
+ * @return	int						1 if OK, <0 if KO
+ */
+function bddswapCheckoutGitBranch($db, string $targetBranch, string &$errorDetail = ''): int
+{
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/utils.class.php';
+
+	if (!preg_match('/^[a-zA-Z0-9._\/\-]+$/', $targetBranch)) {
+		$errorDetail = 'Invalid branch name';
+		return -1;
+	}
+
+	$repoDir = dirname(DOL_DOCUMENT_ROOT);
+	if (!dol_is_dir($repoDir.'/.git')) {
+		$errorDetail = 'Not a git repository';
+		return -2;
+	}
+
+	bddswapAllowGitInConf();
+
+	$utils = new Utils($db);
+	$escapedRepoDir = escapeshellarg($repoDir);
+	$escapedBranch = escapeshellarg($targetBranch);
+
+	// 1. Check if local branch exists
+	$resLocal = $utils->executeCLI('git -C '.$escapedRepoDir.' show-ref --verify --quiet '.escapeshellarg('refs/heads/'.$targetBranch), '', 0, null, 1);
+	if ($resLocal['result'] === 0) {
+		$resCheckout = $utils->executeCLI('git -C '.$escapedRepoDir.' checkout '.$escapedBranch, '', 0, null, 1);
+		if ($resCheckout['result'] === 0) {
+			dol_syslog("BddSwap: checked out local git branch ".$targetBranch, LOG_INFO);
+			return 1;
+		}
+		$errorDetail = trim((string) $resCheckout['output']);
+		return -3;
+	}
+
+	// 2. Otherwise check upstream/<branch> or origin/<branch>
+	foreach (array('upstream', 'origin') as $remote) {
+		$resRemote = $utils->executeCLI('git -C '.$escapedRepoDir.' show-ref --verify --quiet '.escapeshellarg('refs/remotes/'.$remote.'/'.$targetBranch), '', 0, null, 1);
+		if ($resRemote['result'] === 0) {
+			$resCheckout = $utils->executeCLI('git -C '.$escapedRepoDir.' checkout -b '.$escapedBranch.' '.escapeshellarg($remote.'/'.$targetBranch), '', 0, null, 1);
+			if ($resCheckout['result'] === 0) {
+				dol_syslog("BddSwap: created and checked out git branch ".$targetBranch." from ".$remote."/".$targetBranch, LOG_INFO);
+				return 1;
+			}
+			$errorDetail = trim((string) $resCheckout['output']);
+			return -3;
+		}
+	}
+
+	$errorDetail = 'Branch '.$targetBranch.' not found locally or in upstream/origin';
+	return -4;
+}

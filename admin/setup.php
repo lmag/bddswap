@@ -74,6 +74,7 @@ if (empty($user->admin)) {
 
 $action = GETPOST('action', 'aZ09');
 $targetDb = GETPOST('target_db', 'alphanohtml');
+$targetBranch = GETPOST('target_branch', 'alphanohtml');
 $backtopage = GETPOST('backtopage', 'alpha');
 
 
@@ -101,6 +102,16 @@ if ($action === 'swapdb' && !empty($targetDb)) {
 		exit;
 	} else {
 		setEventMessages($langs->trans($errorMsgKey, $targetDb), null, 'errors');
+	}
+} elseif ($action === 'gitcheckout' && !empty($targetBranch)) {
+	$errorDetail = '';
+	$result = bddswapCheckoutGitBranch($db, $targetBranch, $errorDetail);
+	if ($result > 0) {
+		setEventMessages($langs->trans("BddSwapGitCheckoutSuccess", $targetBranch), null, 'mesgs');
+		header("Location: ".$_SERVER["PHP_SELF"]);
+		exit;
+	} else {
+		setEventMessages($langs->trans("BddSwapErrorGitCheckoutFailed", $targetBranch, $errorDetail), null, 'errors');
 	}
 }
 
@@ -235,7 +246,16 @@ foreach ($databases as $dbInfo) {
 		print '-';
 	}
 	print '</td>';
-	print '<td class="right">';
+	print '<td class="right nowraponall">';
+	$correspondingBranch = bddswapGetTargetGitBranch($dbInfo['name'], $dbInfo['version']);
+	if ($correspondingBranch !== '' && $correspondingBranch !== $gitInfo['branch']) {
+		print '<form method="POST" action="'.dolPrintHTMLForAttributeUrl($_SERVER["PHP_SELF"]).'" class="inline-block marginrightonly">';
+		print '<input type="hidden" name="token" value="'.dolPrintHTMLForAttribute(newToken()).'">';
+		print '<input type="hidden" name="action" value="gitcheckout">';
+		print '<input type="hidden" name="target_branch" value="'.dolPrintHTMLForAttribute($correspondingBranch).'">';
+		print '<input type="submit" class="button smallpaddingimp" value="'.dolPrintHTMLForAttribute($langs->trans("BddSwapGitCheckoutBranch", $correspondingBranch)).'">';
+		print '</form>';
+	}
 	if (!$dbExists) {
 		print '<form method="POST" action="'.dolPrintHTMLForAttributeUrl($_SERVER["PHP_SELF"]).'" class="inline-block">';
 		print '<input type="hidden" name="token" value="'.dolPrintHTMLForAttribute(newToken()).'">';
