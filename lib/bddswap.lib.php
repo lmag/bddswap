@@ -460,6 +460,15 @@ function bddswapGetGitCommandPrefix(string $repoDir): string
 
 	$normalizedRepo = str_replace('\\', '/', $repoDir);
 
+	// Set GIT_CONFIG_* environment variables so Git accepts the repository ownership
+	// even when running under the Apache/WAMP Windows service account (LOCAL SYSTEM)
+	// and when Git spawns child hooks or git-lfs processes.
+	@putenv('GIT_CONFIG_COUNT=2');
+	@putenv('GIT_CONFIG_KEY_0=safe.directory');
+	@putenv('GIT_CONFIG_VALUE_0=*');
+	@putenv('GIT_CONFIG_KEY_1=safe.directory');
+	@putenv('GIT_CONFIG_VALUE_1='.$normalizedRepo);
+
 	return $gitBin.' -c '.escapeshellarg('safe.directory=*').' -c '.escapeshellarg('safe.directory='.$normalizedRepo).' -C '.escapeshellarg($normalizedRepo);
 }
 
@@ -563,7 +572,12 @@ function bddswapCheckoutGitBranch($db, string $targetBranch, string &$errorDetai
 
 	$utils = new Utils($db);
 	$gitCmdPrefix = bddswapGetGitCommandPrefix($repoDir);
+	$normalizedRepo = str_replace('\\', '/', $repoDir);
 	$escapedBranch = escapeshellarg($targetBranch);
+
+	// Register the repository in the global gitconfig of the current OS user (e.g. Apache LOCAL SYSTEM)
+	$utils->executeCLI($gitCmdPrefix.' config --global --add safe.directory '.escapeshellarg($normalizedRepo), '', 0, null, 1);
+	$utils->executeCLI($gitCmdPrefix.' config --global --add safe.directory "*"', '', 0, null, 1);
 
 	// 1. Check if local branch exists
 	$resLocal = $utils->executeCLI($gitCmdPrefix.' show-ref --verify --quiet '.escapeshellarg('refs/heads/'.$targetBranch), '', 0, null, 1);
