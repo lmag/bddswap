@@ -99,7 +99,7 @@ class ActionsBddSwap extends CommonHookActions
 		$out .= '<input type="hidden" name="action" value="swapdb">';
 		$out .= '<input type="hidden" name="backtopage" value="'.dolPrintHTMLForAttribute($currentUrl).'">';
 		$out .= '<a href="'.dolPrintHTMLForAttributeUrl($setupUrl).'" class="bddswap-setup-link" title="'.dolPrintHTMLForAttribute($langs->trans("BddSwapSetup")).'">';
-		$out .= img_picto($langs->trans("BddSwapSetup"), 'database', 'class="atoplogin valignmiddle"');
+		$out .= img_picto($langs->trans("BddSwapSetup"), 'fa-database', 'class="atoplogin valignmiddle"');
 		$out .= '</a>';
 		$out .= '<select name="target_db" class="flat bddswap-select" title="'.dolPrintHTMLForAttribute($langs->trans("BddSwapSwitch")).'">';
 		$currentDbVersion = '';
@@ -119,6 +119,7 @@ class ActionsBddSwap extends CommonHookActions
 		}
 		$out .= '</form>';
 		$out .= '</div>';
+		$out .= '<script>document.addEventListener("DOMContentLoaded",function(){var c=document.querySelector(".bddswap-top-container"),l=document.querySelector("div.login_block");if(c&&l&&c.parentElement!==l){l.insertBefore(c,l.firstChild);}});</script>';
 
 		$this->resprints = $out;
 

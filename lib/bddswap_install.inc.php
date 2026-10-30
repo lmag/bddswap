@@ -37,6 +37,9 @@ function bddswapGetInstallDb()
 	$dbType = !empty($dolibarr_main_db_type) ? $dolibarr_main_db_type : 'mysqli';
 	$docRoot = !empty($dolibarr_main_document_root) ? $dolibarr_main_document_root : dirname(__DIR__, 3);
 	require_once $docRoot.'/core/lib/functions.lib.php';
+	if (file_exists($docRoot.'/core/db/'.$dbType.'.class.php')) {
+		require_once $docRoot.'/core/db/'.$dbType.'.class.php';
+	}
 
 	if (!isset($conf) || !is_object($conf)) {
 		$conf = new stdClass();
@@ -62,6 +65,10 @@ function bddswapGetInstallDb()
 		define('DOL_DOCUMENT_ROOT', $docRoot);
 	}
 
+	$prevCwd = getcwd();
+	if (is_dir($docRoot.'/install')) {
+		@chdir($docRoot.'/install');
+	}
 	$db = getDoliDBInstance(
 		$dbType,
 		(string) $dolibarr_main_db_host,
@@ -70,6 +77,9 @@ function bddswapGetInstallDb()
 		(string) $dolibarr_main_db_name,
 		(int) $dolibarr_main_db_port
 	);
+	if ($prevCwd !== false) {
+		@chdir($prevCwd);
+	}
 	if (!is_object($db) || !$db->connected) {
 		return null;
 	}

@@ -127,7 +127,7 @@ $linkback = '<a href="'.dolPrintHTMLForAttributeUrl($backtopage ? $backtopage : 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 
 $head = bddswapAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'database');
+print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'fa-database');
 
 $databases = bddswapGetDatabases($db, true);
 $gitInfo = bddswapGetGitStatus($db);
@@ -217,7 +217,7 @@ foreach ($databases as $dbInfo) {
 	$isVersionMatch = ($dbMajor !== '' && $progMajor !== '' && $dbMajor === $progMajor);
 
 	print '<tr class="oddeven">';
-	print '<td>'.img_picto('', 'database', 'class="pictofixedwidth"').'<strong>'.dolPrintLabel($dbInfo['name']).'</strong></td>';
+	print '<td>'.img_picto('', 'fa-database', 'class="pictofixedwidth"').'<strong>'.dolPrintLabel($dbInfo['name']).'</strong></td>';
 	print '<td>';
 	if (!$dbExists) {
 		print '<span class="opacitymedium">-</span>';

@@ -1,15 +1,38 @@
 /* BddSwap top bar selector styles */
-div.login_block_other {
-	max-width: none !important;
+div.login_block.usedropdown {
+	display: inline-flex !important;
+	align-items: center;
+	height: 50px;
 }
 
-.login_block_other .bddswap-top-container {
-	float: left !important;
+div.login_block_tools,
+div.login_block_other,
+div.login_block_user {
+	display: inline-flex !important;
+	align-items: center;
+	height: 50px !important;
+	line-height: 50px !important;
+	max-width: none !important;
+	clear: none !important;
+}
+
+.login_block_other .login_block_elem {
+	float: none !important;
+	display: inline-flex !important;
+	align-items: center;
+	height: 50px !important;
+	line-height: 50px !important;
+}
+
+.bddswap-top-container {
+	order: -1;
+	float: none !important;
 	display: inline-flex !important;
 	align-items: center;
 	height: 50px !important;
 	line-height: 50px !important;
 	padding: 0 10px 0 4px !important;
+	margin-right: 4px;
 	white-space: nowrap;
 }
 
@@ -66,7 +89,12 @@ div.login_block_other {
 }
 
 @media only screen and (max-width: 767px) {
-	.login_block_other .bddswap-top-container {
+	div.login_block.usedropdown,
+	div.login_block_tools,
+	div.login_block_other,
+	div.login_block_user,
+	.login_block_other .login_block_elem,
+	.bddswap-top-container {
 		height: 38px !important;
 		line-height: 38px !important;
 	}

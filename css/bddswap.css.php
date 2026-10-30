@@ -33,6 +33,6 @@ if (!defined('NOREQUIREAJAX')) {
 }
 
 header('Content-type: text/css; charset=UTF-8');
-header('Cache-Control: max-age=3600, public, must-revalidate');
+header('Cache-Control: no-cache, must-revalidate');
 
 readfile(__DIR__.'/bddswap.css');
