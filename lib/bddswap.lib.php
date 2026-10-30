@@ -443,6 +443,8 @@ function bddswapGetGitStatus($db): array
  */
 function bddswapGetGitCommandPrefix(string $repoDir): string
 {
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
 	$gitBin = 'git';
 	$windowsGitCandidates = array(
 		'C:/Program Files/Git/cmd/git.exe',
@@ -458,7 +460,7 @@ function bddswapGetGitCommandPrefix(string $repoDir): string
 
 	$normalizedRepo = str_replace('\\', '/', $repoDir);
 
-	return $gitBin.' -c '.escapeshellarg('safe.directory='.$normalizedRepo).' -C '.escapeshellarg($normalizedRepo);
+	return $gitBin.' -c '.escapeshellarg('safe.directory=*').' -c '.escapeshellarg('safe.directory='.$normalizedRepo).' -C '.escapeshellarg($normalizedRepo);
 }
 
 /**
