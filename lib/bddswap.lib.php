@@ -418,12 +418,12 @@ function bddswapGetGitStatus($db): array
 	$allowedCmds = !empty($dolibarr_main_restrict_os_commands) ? array_map('trim', explode(',', (string) $dolibarr_main_restrict_os_commands)) : array();
 	if (empty($allowedCmds) || in_array('git', $allowedCmds, true) || in_array('git.exe', $allowedCmds, true)) {
 		$utils = new Utils($db);
-		$escapedRepoDir = escapeshellarg($repoDir);
-		$resCommit = $utils->executeCLI('git -C '.$escapedRepoDir.' log -1 --format="%h - %s (%ci)"', '', 0, null, 1);
+		$gitCmdPrefix = bddswapGetGitCommandPrefix($repoDir);
+		$resCommit = $utils->executeCLI($gitCmdPrefix.' log -1 --format="%h - %s (%ci)"', '', 0, null, 1);
 		if ($resCommit['result'] === 0 && !empty($resCommit['output'])) {
 			$info['commit'] = trim((string) $resCommit['output']);
 		}
-		$resStatus = $utils->executeCLI('git -C '.$escapedRepoDir.' status --short', '', 0, null, 1);
+		$resStatus = $utils->executeCLI($gitCmdPrefix.' status --short', '', 0, null, 1);
 		if ($resStatus['result'] === 0) {
 			$statusOut = trim((string) $resStatus['output']);
 			$info['status'] = $statusOut;
@@ -432,6 +432,33 @@ function bddswapGetGitStatus($db): array
 	}
 
 	return $info;
+}
+
+/**
+ * Return the git binary command prefix including `-c safe.directory=<repoDir> -C <repoDir>`
+ * so git works reliably under Apache/WAMP service accounts on Windows as well as Linux.
+ *
+ * @param	string	$repoDir	Repository root directory
+ * @return	string				Git command prefix
+ */
+function bddswapGetGitCommandPrefix(string $repoDir): string
+{
+	$gitBin = 'git';
+	$windowsGitCandidates = array(
+		'C:/Program Files/Git/cmd/git.exe',
+		'C:/Program Files/Git/bin/git.exe',
+		'C:/Program Files (x86)/Git/cmd/git.exe',
+	);
+	foreach ($windowsGitCandidates as $candidate) {
+		if (dol_is_file($candidate)) {
+			$gitBin = '"'.$candidate.'"';
+			break;
+		}
+	}
+
+	$normalizedRepo = str_replace('\\', '/', $repoDir);
+
+	return $gitBin.' -c '.escapeshellarg('safe.directory='.$normalizedRepo).' -C '.escapeshellarg($normalizedRepo);
 }
 
 /**
@@ -533,13 +560,13 @@ function bddswapCheckoutGitBranch($db, string $targetBranch, string &$errorDetai
 	bddswapAllowGitInConf();
 
 	$utils = new Utils($db);
-	$escapedRepoDir = escapeshellarg($repoDir);
+	$gitCmdPrefix = bddswapGetGitCommandPrefix($repoDir);
 	$escapedBranch = escapeshellarg($targetBranch);
 
 	// 1. Check if local branch exists
-	$resLocal = $utils->executeCLI('git -C '.$escapedRepoDir.' show-ref --verify --quiet '.escapeshellarg('refs/heads/'.$targetBranch), '', 0, null, 1);
+	$resLocal = $utils->executeCLI($gitCmdPrefix.' show-ref --verify --quiet '.escapeshellarg('refs/heads/'.$targetBranch), '', 0, null, 1);
 	if ($resLocal['result'] === 0) {
-		$resCheckout = $utils->executeCLI('git -C '.$escapedRepoDir.' checkout '.$escapedBranch, '', 0, null, 1);
+		$resCheckout = $utils->executeCLI($gitCmdPrefix.' checkout '.$escapedBranch, '', 0, null, 1);
 		if ($resCheckout['result'] === 0) {
 			dol_syslog("BddSwap: checked out local git branch ".$targetBranch, LOG_INFO);
 			return 1;
@@ -549,10 +576,11 @@ function bddswapCheckoutGitBranch($db, string $targetBranch, string &$errorDetai
 	}
 
 	// 2. Otherwise check upstream/<branch> or origin/<branch>
+	$lastVerifyOutput = '';
 	foreach (array('upstream', 'origin') as $remote) {
-		$resRemote = $utils->executeCLI('git -C '.$escapedRepoDir.' show-ref --verify --quiet '.escapeshellarg('refs/remotes/'.$remote.'/'.$targetBranch), '', 0, null, 1);
+		$resRemote = $utils->executeCLI($gitCmdPrefix.' show-ref --verify --quiet '.escapeshellarg('refs/remotes/'.$remote.'/'.$targetBranch), '', 0, null, 1);
 		if ($resRemote['result'] === 0) {
-			$resCheckout = $utils->executeCLI('git -C '.$escapedRepoDir.' checkout -b '.$escapedBranch.' '.escapeshellarg($remote.'/'.$targetBranch), '', 0, null, 1);
+			$resCheckout = $utils->executeCLI($gitCmdPrefix.' checkout -b '.$escapedBranch.' '.escapeshellarg($remote.'/'.$targetBranch), '', 0, null, 1);
 			if ($resCheckout['result'] === 0) {
 				dol_syslog("BddSwap: created and checked out git branch ".$targetBranch." from ".$remote."/".$targetBranch, LOG_INFO);
 				return 1;
@@ -560,8 +588,11 @@ function bddswapCheckoutGitBranch($db, string $targetBranch, string &$errorDetai
 			$errorDetail = trim((string) $resCheckout['output']);
 			return -3;
 		}
+		if (!empty($resRemote['output'])) {
+			$lastVerifyOutput = trim((string) $resRemote['output']);
+		}
 	}
 
-	$errorDetail = 'Branch '.$targetBranch.' not found locally or in upstream/origin';
+	$errorDetail = !empty($lastVerifyOutput) ? $lastVerifyOutput : 'Branch '.$targetBranch.' not found locally or in upstream/origin';
 	return -4;
 }

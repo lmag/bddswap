@@ -119,6 +119,7 @@ class ActionsBddSwap extends CommonHookActions
 		}
 		$out .= '</form>';
 		$out .= '</div>';
+		$out .= '<script>document.addEventListener("DOMContentLoaded",function(){var c=document.querySelector(".bddswap-top-container"),l=document.querySelector("div.login_block");if(c&&l&&c.parentElement!==l){l.insertBefore(c,l.firstChild);}});</script>';
 
 		$this->resprints = $out;
 

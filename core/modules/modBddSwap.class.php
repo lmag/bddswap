@@ -58,7 +58,7 @@ class modBddSwap extends DolibarrModules
 		$this->descriptionlong = 'ModuleBddSwapDescLong';
 		$this->editor_name = 'Eoxia';
 		$this->editor_url = 'https://eoxia.com';
-		$this->version = '1.0.0';
+		$this->version = '1.0.2';
 		$this->const_name = 'MAIN_MODULE_'.dol_strtoupper($this->name);
 		$this->picto = 'database';
 
